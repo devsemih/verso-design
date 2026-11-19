@@ -16,6 +16,8 @@ const { EXT_BY_TYPE } = require('./images')
 const { version } = require('../package.json')
 
 const PUBLIC_DIR = path.join(__dirname, '..', 'public')
+// Browser build of html-to-image, used by the editor for screenshots.
+const HTML_TO_IMAGE = path.join(path.dirname(require.resolve('html-to-image')), '..', 'dist', 'html-to-image.js')
 const MIME = {
   '.html': 'text/html; charset=utf-8',
   '.css': 'text/css; charset=utf-8',
@@ -228,6 +230,7 @@ async function startServer({ port = 4444, host = '127.0.0.1', dataDir = defaultD
         return serveFile(res, path.join(store.assetsRoot, files[1], files[2]), { 'Cache-Control': 'public, max-age=3600', 'Content-Security-Policy': "default-src 'none'; style-src 'unsafe-inline'" })
       }
 
+      if (url === '/vendor/html-to-image.js') return serveFile(res, HTML_TO_IMAGE)
       if (url === '/' || url === '/index.html') return serveFile(res, path.join(PUBLIC_DIR, 'index.html'))
       if (/^\/p\/[a-z0-9-]+$/.test(url)) return serveFile(res, path.join(PUBLIC_DIR, 'editor.html'))
       if (/^\/preview\/[a-z0-9-]+$/.test(url)) return serveFile(res, path.join(PUBLIC_DIR, 'preview.html'))

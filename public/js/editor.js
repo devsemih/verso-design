@@ -710,21 +710,10 @@ async function handleGetScreenshot() {
 
   let captured = null;
   for (let attempt = 0; attempt < 4; attempt++) {
-    const cleanup = await prepareForCapture(iframeDoc, contentEl);
     try {
-      captured = await html2canvas(contentEl, {
-        scale: web ? 1 : 2,
-        useCORS: true,
-        allowTaint: false,
-        width, height,
-        windowWidth: width,
-        windowHeight: height,
-        proxy: null,
-      });
+      captured = await captureScreenCanvas(iframe, { width, height, scale: web ? 1 : 2 });
     } catch (e) {
       return { error: 'Screenshot capture failed: ' + e.message };
-    } finally {
-      cleanup();
     }
     if (!hasContent || !looksBlank(captured)) break;
     await new Promise(r => setTimeout(r, 700));
@@ -2776,15 +2765,14 @@ function slugify(name) {
 }
 
 /**
- * Prepare an iframe document for html2canvas capture.
- * Handles: iconify icons (Shadow DOM → inline SVG), external images (proxy),
- * and oklab/oklch color neutralization.
+ * Prepare an iframe document for capture.
+ * Handles: iconify icons (Shadow DOM → inline SVG) and external images (proxy).
  * Returns a cleanup function.
  */
 async function prepareForCapture(iframeDoc, contentEl) {
   const win = iframeDoc.defaultView;
 
-  // 1. Inline iconify-icon SVGs (html2canvas can't see Shadow DOM)
+  // 1. Inline iconify-icon SVGs (cloned DOM does not include Shadow DOM)
   const iconBackups = [];
   iframeDoc.querySelectorAll('iconify-icon').forEach(icon => {
     const svg = icon.shadowRoot?.querySelector('svg');
@@ -2851,11 +2839,7 @@ async function prepareForCapture(iframeDoc, contentEl) {
   // Small delay to let background image proxy fetches complete
   await new Promise(r => setTimeout(r, 100));
 
-  // 3. Neutralize oklab/oklch colors
-  const restoreColors = neutralizeModernColors(iframeDoc);
-
   return function cleanup() {
-    restoreColors();
     iconBackups.forEach(({ original, clone }) => {
       if (clone.parentNode) clone.parentNode.replaceChild(original, clone);
     });
@@ -2867,164 +2851,57 @@ async function prepareForCapture(iframeDoc, contentEl) {
   };
 }
 
-/**
- * Neutralize ALL modern color functions (oklab, oklch, color(), color-mix, etc.)
- * that html2canvas cannot parse. Converts everything to sRGB rgb/rgba.
- * Returns a cleanup function.
- */
-function neutralizeModernColors(iframeDoc) {
-  const win = iframeDoc.defaultView;
-  if (!win) return () => {};
-
-  // Matches any modern color function html2canvas can't handle:
-  // oklab(...), oklch(...), color(...), color-mix(...), lab(...), lch(...)
-  const modernColorRe = /(?:ok(?:lab|lch)|color-mix|color|lab|lch)\s*\([^;{}]*?\)/gi;
-
-  // Check if a string contains any modern color function
-  function hasModernColor(str) {
-    return /(?:oklab|oklch|color-mix|color\s*\(|(?<![a-z-])lab\s*\(|(?<![a-z-])lch\s*\()/i.test(str);
-  }
-
-  // Canvas-based color resolver — converts ANY color to sRGB rgb/rgba
-  const cvs = iframeDoc.createElement('canvas');
-  cvs.width = 1; cvs.height = 1;
-  const ctx = cvs.getContext('2d');
-
-  function resolveColor(colorStr) {
-    try {
-      ctx.clearRect(0, 0, 1, 1);
-      ctx.fillStyle = '#808080';
-      ctx.fillStyle = colorStr;
-      ctx.fillRect(0, 0, 1, 1);
-      const [r, g, b, a] = ctx.getImageData(0, 0, 1, 1).data;
-      if (a === 0) return 'transparent';
-      if (a === 255) return `rgb(${r}, ${g}, ${b})`;
-      return `rgba(${r}, ${g}, ${b}, ${(a / 255).toFixed(3)})`;
-    } catch (e) {
-      return 'rgb(128, 128, 128)';
-    }
-  }
-
-  function replaceModernColors(cssText) {
-    modernColorRe.lastIndex = 0;
-    return cssText.replace(modernColorRe, (match) => resolveColor(match));
-  }
-
-  // 1. Process <style> elements
-  const styleBackups = [];
-  iframeDoc.querySelectorAll('style').forEach(styleEl => {
-    const original = styleEl.textContent;
-    if (hasModernColor(original)) {
-      styleBackups.push({ el: styleEl, original });
-      styleEl.textContent = replaceModernColors(original);
-    }
+// Screenshots and PNG export render through SVG foreignObject (html-to-image),
+// so the browser's own layout engine paints them and they match the canvas.
+// The library is loaded into the screen's iframe on first use.
+async function loadCaptureLib(win) {
+  if (win.htmlToImage) return win.htmlToImage;
+  await new Promise((resolve, reject) => {
+    const s = win.document.createElement('script');
+    s.src = '/vendor/html-to-image.js';
+    s.onload = resolve;
+    s.onerror = () => reject(new Error('Could not load the screenshot renderer'));
+    win.document.head.appendChild(s);
   });
+  return win.htmlToImage;
+}
 
-  // 2. Process CSSOM rules (Tailwind CDN injects via CSSStyleSheet)
-  const cssomBackups = [];
+async function captureScreenCanvas(iframe, { width, height, scale }) {
+  const doc = iframe.contentDocument;
+  const contentEl = doc.querySelector('#canvas');
+  if (!contentEl) throw new Error('No content to capture');
+  const lib = await loadCaptureLib(iframe.contentWindow);
+  const cleanup = await prepareForCapture(doc, contentEl);
   try {
-    Array.from(iframeDoc.styleSheets).forEach(sheet => {
-      try {
-        const rules = sheet.cssRules || sheet.rules;
-        if (!rules) return;
-        for (let i = 0; i < rules.length; i++) {
-          const txt = rules[i].cssText || '';
-          if (hasModernColor(txt)) {
-            const fixed = replaceModernColors(txt);
-            if (fixed !== txt) {
-              cssomBackups.push({ sheet, index: i, original: txt });
-              try { sheet.deleteRule(i); sheet.insertRule(fixed, i); } catch(e) {}
-            }
-          }
-        }
-      } catch(e) {}
+    const firstChild = contentEl.firstElementChild;
+    const bg = (firstChild && iframe.contentWindow.getComputedStyle(firstChild).backgroundColor) || '#ffffff';
+    return await lib.toCanvas(contentEl, {
+      width,
+      height,
+      pixelRatio: scale,
+      backgroundColor: bg === 'rgba(0, 0, 0, 0)' ? '#ffffff' : bg,
+      style: { width: width + 'px', height: height + 'px', overflow: 'hidden' },
     });
-  } catch(e) {}
-
-  // 3. Stamp computed sRGB values on ALL elements for all color properties.
-  //    This is the nuclear option — guarantees html2canvas only sees rgb/rgba.
-  const computedBackups = [];
-  const colorProps = [
-    'color', 'background-color',
-    'border-color', 'border-top-color', 'border-right-color', 'border-bottom-color', 'border-left-color',
-    'outline-color', 'text-decoration-color', 'caret-color', 'column-rule-color', 'accent-color',
-    'fill', 'stroke',
-  ];
-
-  iframeDoc.querySelectorAll('body, body *').forEach(el => {
-    const cs = win.getComputedStyle(el);
-    const origStyle = el.getAttribute('style') || '';
-    let patched = false;
-
-    colorProps.forEach(prop => {
-      const val = cs.getPropertyValue(prop);
-      if (val && val !== 'transparent' && val !== 'none' && val !== '' && hasModernColor(val)) {
-        el.style.setProperty(prop, resolveColor(val), 'important');
-        patched = true;
-      }
-    });
-
-    // box-shadow may contain colors
-    const shadow = cs.getPropertyValue('box-shadow');
-    if (shadow && shadow !== 'none' && hasModernColor(shadow)) {
-      el.style.setProperty('box-shadow', replaceModernColors(shadow), 'important');
-      patched = true;
-    }
-
-    // background-image gradients
-    const bgImage = cs.backgroundImage;
-    if (bgImage && bgImage !== 'none' && hasModernColor(bgImage)) {
-      el.style.setProperty('background-image', replaceModernColors(bgImage), 'important');
-      patched = true;
-    }
-
-    if (patched) computedBackups.push({ el, original: origStyle });
-  });
-
-  return function restore() {
-    computedBackups.reverse().forEach(({ el, original }) => {
-      if (original) el.setAttribute('style', original);
-      else el.removeAttribute('style');
-    });
-    styleBackups.forEach(({ el, original }) => { el.textContent = original; });
-    cssomBackups.reverse().forEach(({ sheet, index, original }) => {
-      try { sheet.deleteRule(index); sheet.insertRule(original, index); } catch(e) {}
-    });
-  };
+  } finally {
+    cleanup();
+  }
 }
 
 async function exportPNG() {
   const screen = state.screens[state.activeScreenIndex];
   const iframe = getActiveIframe();
   if (!iframe || !iframe.contentDocument) { alert('No design to export'); return; }
-
-  const iframeDoc = iframe.contentDocument;
-  const contentEl = iframeDoc.querySelector('#canvas');
-  if (!contentEl) return;
-
-  const cleanup = await prepareForCapture(iframeDoc, contentEl);
-
+  const web = state.settings.device === 'Web';
   try {
-    const captured = await html2canvas(contentEl, {
-      scale: 2,
-      useCORS: true,
-      allowTaint: false,
-      width: 393,
-      height: 852,
-      windowWidth: 393,
-      windowHeight: 852,
-      proxy: null,
-    });
-
+    await waitForScreenAssets(iframe.contentDocument);
+    const captured = await captureScreenCanvas(iframe, { width: web ? 1440 : 393, height: web ? 900 : 852, scale: web ? 1 : 2 });
     const link = document.createElement('a');
     link.download = `${slugify(screen.name)}.png`;
     link.href = captured.toDataURL('image/png');
     link.click();
-  } catch(e) {
+  } catch (e) {
     console.error('PNG export failed:', e);
     alert('PNG export failed: ' + e.message);
-  } finally {
-    cleanup();
   }
 }
 
