@@ -89,9 +89,14 @@ window.addEventListener('focus', () => {
 // ==================== TOOL CALL HANDLER ====================
 async function handleToolCall(msg) {
   const { id, tool, args } = msg;
-  state.isWorking = true;
-  renderWorkingState();
-  clearTimeout(workingTimeout);
+  // The "working" shimmer is for changes; reads should not blur the screen.
+  const READ_ONLY = ['get_tree', 'get_selection', 'list_screens', 'get_screen_html', 'get_design_settings', 'get_screenshot', 'auto_prototype'];
+  const showWorking = !READ_ONLY.includes(tool);
+  if (showWorking) {
+    state.isWorking = true;
+    renderWorkingState();
+    clearTimeout(workingTimeout);
+  }
 
   let result;
   try {
@@ -132,14 +137,18 @@ async function handleToolCall(msg) {
   }
 
   // Keep the screen the agent is working on in view.
+  // New screens: fit everything while that stays readable, else pan to it.
   if (!result || !result.error) {
-    if (['create_screen', 'switch_screen', 'write_html'].includes(tool) || (args && args.screen !== undefined)) revealScreen(state.activeScreenIndex);
+    if (tool === 'create_screen' && fitZoomValue() >= 0.35) animateView(zoomFit);
+    else if (['create_screen', 'switch_screen', 'write_html'].includes(tool) || (args && args.screen !== undefined)) animateView(() => revealScreen(state.activeScreenIndex));
   }
 
-  workingTimeout = setTimeout(() => {
-    state.isWorking = false;
-    renderWorkingState();
-  }, 800);
+  if (showWorking) {
+    workingTimeout = setTimeout(() => {
+      state.isWorking = false;
+      renderWorkingState();
+    }, 800);
+  }
 }
 
 // ==================== SNAP ALIGNMENT ====================
@@ -1578,14 +1587,28 @@ function getPromptBarOffset() {
   return bar.offsetHeight + 20; // height + bottom gap
 }
 
-function zoomFit() {
+function fitZoomValue() {
   const canvas = document.getElementById('canvas-area');
   const { width, height } = getCanvasContentSize();
   const promptH = getPromptBarOffset();
   const padX = Math.min(80, canvas.clientWidth * 0.08), padY = Math.min(80, canvas.clientHeight * 0.08);
   const scaleX = (canvas.clientWidth - padX * 2) / width;
   const scaleY = (canvas.clientHeight - promptH - padY * 2) / height;
-  state.zoom = Math.max(0.1, Math.min(scaleX, scaleY, 1.5));
+  return Math.max(0.1, Math.min(scaleX, scaleY, 1.5));
+}
+
+// Run a pan/zoom change with a short ease, used when the agent moves the view.
+function animateView(change) {
+  const el = document.getElementById('canvas-transform');
+  el.style.transition = 'transform 0.45s cubic-bezier(0.22, 1, 0.36, 1)';
+  change();
+  clearTimeout(animateView._t);
+  animateView._t = setTimeout(() => { el.style.transition = ''; }, 500);
+}
+
+function zoomFit() {
+  const promptH = getPromptBarOffset();
+  state.zoom = fitZoomValue();
   state.panX = 0;
   state.panY = -promptH / 2;
   applyTransform();

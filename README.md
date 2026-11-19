@@ -2,6 +2,8 @@
 
 A local design canvas for AI agents. Ask Claude Code, Codex, Cursor or any MCP client to design mobile and web screens, and watch them appear in your browser as they are built.
 
+![An agent designs three screens of a budgeting app in Verso. The user clicks the balance card, leaves a note asking for a warmer color, and the agent reads the note and changes the gradient.](https://raw.githubusercontent.com/devsemih/verso-design/main/docs/demo.gif)
+
 - **Runs on your computer.** No account, no cloud, no database. Projects are plain JSON files in `~/.verso`.
 - **Bring your own agent.** Verso has no AI of its own. Your agent does the designing through MCP, on the plan you already pay for.
 - **Real screens.** Every screen is HTML + Tailwind CSS v4 inside an iPhone (393×852) or desktop (1440) frame, ready to hand to a coding agent.
@@ -41,6 +43,8 @@ You need Node.js 18.17 or newer.
 To browse your projects without an agent, run `npx verso-design`. It opens http://localhost:4444.
 
 ## What you can do on the canvas
+
+![The Verso editor: the agent panel with the connect command and a live activity feed on the left, three designed phone screens in the middle, and the project's design system on the right.](https://raw.githubusercontent.com/devsemih/verso-design/main/docs/screenshot.png)
 
 - **Watch and steer.** The left panel shows each tool call the agent makes, live.
 - **Point at things.** Click any element, then tell your agent "make the selected button bigger". The agent reads your selection with `get_selection`.
@@ -127,6 +131,8 @@ Point your agent at your checkout:
 claude mcp add verso-dev -- node /path/to/verso-design/bin/verso.js mcp
 ```
 
+`scripts/make-demo.sh` records the demo above with headless Chrome and rebuilds `docs/demo.gif` and `docs/screenshot.png`. It uses a throwaway project, so nothing from your machine ends up in the images. It needs Google Chrome, ffmpeg and ImageMagick.
+
 ```
 bin/verso.js        CLI: start the canvas, or run the stdio MCP server
 server/index.js     HTTP server, API, static files, localhost guard
@@ -136,6 +142,7 @@ server/store.js     File-based project storage
 server/images.js    Photo search and image import
 server/guide.js     Design guide and MCP instructions
 public/             Editor, project list, renderer and preview pages
+scripts/            Demo recording for the README
 ```
 
 ## License
