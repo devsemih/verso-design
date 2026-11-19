@@ -677,19 +677,34 @@ async function waitForScreenAssets(iframeDoc, timeoutMs = 4000) {
   const images = Array.from(iframeDoc.images).map(img =>
     img.complete ? null : new Promise(r => { img.addEventListener('load', r, { once: true }); img.addEventListener('error', r, { once: true }); })
   ).filter(Boolean);
-  await Promise.race([Promise.all([fonts, ...images]), timeout]);
+  await Promise.race([Promise.all([fonts, ...images, iconsLoaded(iframeDoc)]), timeout]);
 }
 
-// Let one-time animations (entrances, reveals) finish so the capture shows the
-// settled design. Looping animations are captured as they are.
-async function waitForEntranceAnimations(doc, timeoutMs = 4000) {
-  if (!doc.getAnimations) return;
-  const finite = doc.getAnimations().filter(a => {
-    const t = a.effect && a.effect.getComputedTiming ? a.effect.getComputedTiming() : null;
-    return t && Number.isFinite(t.endTime) && a.playState === 'running';
+// Iconify icons load from its API after the HTML is written. Resolve once none
+// is still loading (unknown icon names fail, and do not block).
+function iconsLoaded(doc) {
+  return new Promise(resolve => {
+    const check = () => {
+      const pending = Array.from(doc.querySelectorAll('iconify-icon')).filter(el => el.status === 'loading' || (el.status === undefined && !(el.shadowRoot && el.shadowRoot.querySelector('svg'))));
+      if (!pending.length) return resolve();
+      setTimeout(check, 80);
+    };
+    check();
   });
-  if (!finite.length) return;
-  await Promise.race([Promise.all(finite.map(a => a.finished.catch(() => {}))), new Promise(r => setTimeout(r, timeoutMs))]);
+}
+
+// Jump one-time animations and transitions (entrances, the renderer's fade-in)
+// to their end state, so the capture shows the settled design. Waiting is not
+// enough: in a background tab animations do not advance at all. Looping
+// animations are captured as they are.
+async function waitForEntranceAnimations(doc) {
+  if (!doc.getAnimations) return;
+  for (const a of doc.getAnimations()) {
+    const t = a.effect && a.effect.getComputedTiming ? a.effect.getComputedTiming() : null;
+    if (t && Number.isFinite(t.endTime) && a.playState !== 'finished') {
+      try { a.finish(); } catch { /* not finishable */ }
+    }
+  }
 }
 
 // True when every sampled pixel has the same color, i.e. nothing rendered.
@@ -2878,6 +2893,28 @@ async function loadCaptureLib(win) {
   return win.htmlToImage;
 }
 
+// Current values of every animated property, keyed by data-ps-id, so the
+// capture can show elements exactly as they look right now.
+function snapshotAnimatedStyles(doc, win) {
+  const frozen = new Map();
+  for (const a of doc.getAnimations ? doc.getAnimations() : []) {
+    const target = a.effect && a.effect.target;
+    const id = target && target.getAttribute && target.getAttribute('data-ps-id');
+    if (!id || !a.effect.getKeyframes) continue;
+    const cs = win.getComputedStyle(target);
+    const props = frozen.get(id) || {};
+    for (const kf of a.effect.getKeyframes()) {
+      for (const key of Object.keys(kf)) {
+        if (['offset', 'computedOffset', 'easing', 'composite'].includes(key)) continue;
+        const css = key.replace(/[A-Z]/g, m => '-' + m.toLowerCase());
+        props[css] = cs.getPropertyValue(css);
+      }
+    }
+    frozen.set(id, props);
+  }
+  return frozen;
+}
+
 async function captureScreenCanvas(iframe, { width, height, scale }) {
   const doc = iframe.contentDocument;
   const contentEl = doc.querySelector('#canvas');
@@ -2885,24 +2922,60 @@ async function captureScreenCanvas(iframe, { width, height, scale }) {
   const win = iframe.contentWindow;
   const lib = await loadCaptureLib(win);
   await waitForEntranceAnimations(doc);
-  // Copy every computed property except animations and transitions: a copied
-  // animation would restart in the rendered image and show its first frame.
+  const frozen = snapshotAnimatedStyles(doc, win);
+  // Copy every computed property except animations and transitions.
   const styleProps = Array.from(win.getComputedStyle(doc.documentElement)).filter(p => !/^(animation|transition)/.test(p));
   const cleanup = await prepareForCapture(doc, contentEl);
+  let svgUrl;
   try {
-    const firstChild = contentEl.firstElementChild;
-    const bg = (firstChild && iframe.contentWindow.getComputedStyle(firstChild).backgroundColor) || '#ffffff';
-    return await lib.toCanvas(contentEl, {
+    svgUrl = await lib.toSvg(contentEl, {
       width,
       height,
-      pixelRatio: scale,
-      backgroundColor: bg === 'rgba(0, 0, 0, 0)' ? '#ffffff' : bg,
       includeStyleProperties: styleProps,
       style: { width: width + 'px', height: height + 'px', overflow: 'hidden' },
     });
   } finally {
     cleanup();
   }
+
+  // Animations would restart inside the rendered image and show their first
+  // frame. Pin animated elements to their current values (SVG elements keep
+  // their original inline styles in the copy) and switch animations off.
+  const xml = new DOMParser().parseFromString(decodeURIComponent(svgUrl.slice(svgUrl.indexOf(',') + 1)), 'image/svg+xml');
+  for (const [id, props] of frozen) {
+    const el = xml.querySelector(`[data-ps-id="${id}"]`);
+    if (!el || !el.style) continue;
+    for (const [prop, value] of Object.entries(props)) el.style.setProperty(prop, value, 'important');
+  }
+  const host = xml.querySelector('foreignObject > *');
+  if (host) {
+    const freeze = xml.createElementNS('http://www.w3.org/1999/xhtml', 'style');
+    freeze.textContent = '*, *::before, *::after { animation: none !important; transition: none !important; }';
+    host.insertBefore(freeze, host.firstChild);
+  }
+  // Embedded fonts use font-display: swap, so the first paint of the image
+  // uses a fallback font. Block instead, and decode twice: the second image
+  // reuses the already decoded fonts.
+  const markup = new XMLSerializer().serializeToString(xml).replace(/font-display:\s*swap/g, 'font-display: block');
+  const src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(markup);
+  const warm = new Image();
+  warm.src = src;
+  await warm.decode();
+  await new Promise(r => setTimeout(r, 120));
+  const img = new Image();
+  img.src = src;
+  await img.decode();
+
+  const canvas = document.createElement('canvas');
+  canvas.width = Math.round(width * scale);
+  canvas.height = Math.round(height * scale);
+  const ctx = canvas.getContext('2d');
+  const firstChild = contentEl.firstElementChild;
+  const bg = (firstChild && win.getComputedStyle(firstChild).backgroundColor) || '#ffffff';
+  ctx.fillStyle = bg === 'rgba(0, 0, 0, 0)' ? '#ffffff' : bg;
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+  return canvas;
 }
 
 async function exportPNG() {

@@ -208,6 +208,14 @@
   }
 
   // --- Public API ---
+  // iconify-icon only draws an icon once it is on screen (IntersectionObserver),
+  // and reads the opt-out attribute only when the element is created. Screens
+  // off canvas, in a background tab or being screenshotted would stay blank,
+  // so every icon is created with noobserver.
+  function eagerIcons(html) {
+    return String(html).replace(/<iconify-icon(?![^>]*\bnoobserver\b)/gi, '<iconify-icon noobserver');
+  }
+
   window.PS = {
     setHTML(html) {
       const canvas = document.getElementById('canvas');
@@ -246,14 +254,16 @@
       }
 
       // Set body content FIRST so Tailwind can find all classes when it processes the theme
+      canvas.style.transition = 'none';
       canvas.style.opacity = '0';
-      canvas.innerHTML = html.trim();
+      canvas.innerHTML = eagerIcons(html.trim());
       assignIds(canvas);
-      // Fade-in reveal
-      requestAnimationFrame(() => {
-        canvas.style.transition = 'opacity 0.35s ease';
-        canvas.style.opacity = '1';
-      });
+      // Fade-in reveal. A forced reflow starts the transition without
+      // requestAnimationFrame, which never fires while the tab is in the
+      // background (and would leave the screen invisible to screenshots).
+      void canvas.offsetHeight;
+      canvas.style.transition = 'opacity 0.35s ease';
+      canvas.style.opacity = '1';
 
       // CRITICAL: Remove old theme and create a fresh <style type="text/tailwindcss">.
       // Tailwind v4 browser CDN transforms the original element after processing it.
@@ -320,7 +330,7 @@
       const parent = el.parentElement;
       if (!parent) return 'Error: Cannot replace a root element';
       const placeholder = document.createElement('div');
-      placeholder.innerHTML = html.trim();
+      placeholder.innerHTML = eagerIcons(html.trim());
       const newEl = placeholder.firstElementChild;
       if (!newEl) return 'Error: Replacement HTML has no root element';
       parent.replaceChild(newEl, el);
@@ -336,9 +346,9 @@
       const el = findNode(parentId);
       if (!el) return 'Error: Node not found: ' + parentId;
       if (position === 'replace') {
-        el.innerHTML = html;
+        el.innerHTML = eagerIcons(html);
       } else {
-        el.insertAdjacentHTML(position || 'beforeend', html);
+        el.insertAdjacentHTML(position || 'beforeend', eagerIcons(html));
       }
       assignIds(el.parentElement || el);
       notifyLayerUpdate();

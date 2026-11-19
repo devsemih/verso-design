@@ -30,8 +30,8 @@ const THEME = `<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta
 const STATUS = `<div class="flex justify-between items-center px-7 pt-3.5 pb-1 text-[13px] font-bold">
     <span>9:41</span>
     <div class="flex items-center gap-1.5">
-      <iconify-icon icon="solar:signal-cellular-outline" class="size-4"></iconify-icon>
-      <iconify-icon icon="solar:wifi-linear" class="size-4"></iconify-icon>
+      <iconify-icon icon="ph:cell-signal-full-fill" class="size-4"></iconify-icon>
+      <iconify-icon icon="ph:wifi-high-bold" class="size-4"></iconify-icon>
       <iconify-icon icon="solar:battery-full-linear" class="size-5"></iconify-icon>
     </div>
   </div>`

@@ -85,8 +85,8 @@ For dark themes, invert the surfaces: \`--background: #0A0A0A; --foreground: #FA
   <div class="flex justify-between items-center px-6 pt-3 pb-2 text-xs font-semibold">
     <span>9:41</span>
     <div class="flex items-center gap-1.5">
-      <iconify-icon icon="solar:signal-cellular-outline" class="size-4"></iconify-icon>
-      <iconify-icon icon="solar:wifi-linear" class="size-4"></iconify-icon>
+      <iconify-icon icon="ph:cell-signal-full-fill" class="size-4"></iconify-icon>
+      <iconify-icon icon="ph:wifi-high-bold" class="size-4"></iconify-icon>
       <iconify-icon icon="solar:battery-charge-linear" class="size-4"></iconify-icon>
     </div>
   </div>
