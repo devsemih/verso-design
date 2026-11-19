@@ -680,6 +680,18 @@ async function waitForScreenAssets(iframeDoc, timeoutMs = 4000) {
   await Promise.race([Promise.all([fonts, ...images]), timeout]);
 }
 
+// Let one-time animations (entrances, reveals) finish so the capture shows the
+// settled design. Looping animations are captured as they are.
+async function waitForEntranceAnimations(doc, timeoutMs = 4000) {
+  if (!doc.getAnimations) return;
+  const finite = doc.getAnimations().filter(a => {
+    const t = a.effect && a.effect.getComputedTiming ? a.effect.getComputedTiming() : null;
+    return t && Number.isFinite(t.endTime) && a.playState === 'running';
+  });
+  if (!finite.length) return;
+  await Promise.race([Promise.all(finite.map(a => a.finished.catch(() => {}))), new Promise(r => setTimeout(r, timeoutMs))]);
+}
+
 // True when every sampled pixel has the same color, i.e. nothing rendered.
 function looksBlank(canvas) {
   const w = 24, h = 48;
@@ -2870,7 +2882,12 @@ async function captureScreenCanvas(iframe, { width, height, scale }) {
   const doc = iframe.contentDocument;
   const contentEl = doc.querySelector('#canvas');
   if (!contentEl) throw new Error('No content to capture');
-  const lib = await loadCaptureLib(iframe.contentWindow);
+  const win = iframe.contentWindow;
+  const lib = await loadCaptureLib(win);
+  await waitForEntranceAnimations(doc);
+  // Copy every computed property except animations and transitions: a copied
+  // animation would restart in the rendered image and show its first frame.
+  const styleProps = Array.from(win.getComputedStyle(doc.documentElement)).filter(p => !/^(animation|transition)/.test(p));
   const cleanup = await prepareForCapture(doc, contentEl);
   try {
     const firstChild = contentEl.firstElementChild;
@@ -2880,6 +2897,7 @@ async function captureScreenCanvas(iframe, { width, height, scale }) {
       height,
       pixelRatio: scale,
       backgroundColor: bg === 'rgba(0, 0, 0, 0)' ? '#ffffff' : bg,
+      includeStyleProperties: styleProps,
       style: { width: width + 'px', height: height + 'px', overflow: 'hidden' },
     });
   } finally {
