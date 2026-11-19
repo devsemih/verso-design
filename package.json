@@ -1,0 +1,48 @@
+{
+  "name": "verso-design",
+  "version": "0.1.0",
+  "description": "A local design canvas for AI agents. Claude Code, Codex, Cursor and other MCP clients design mobile and web screens live in your browser.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/devsemih/verso-design.git"
+  },
+  "homepage": "https://github.com/devsemih/verso-design#readme",
+  "bugs": {
+    "url": "https://github.com/devsemih/verso-design/issues"
+  },
+  "bin": {
+    "verso": "bin/verso.js",
+    "verso-design": "bin/verso.js"
+  },
+  "files": [
+    "bin",
+    "server",
+    "public",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "start": "node bin/verso.js",
+    "dev": "node bin/verso.js --no-open",
+    "mcp": "node bin/verso.js mcp"
+  },
+  "engines": {
+    "node": ">=18.17"
+  },
+  "keywords": [
+    "mcp",
+    "design",
+    "claude",
+    "codex",
+    "ai",
+    "figma-alternative",
+    "mobile-design",
+    "tailwind"
+  ],
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.32.2",
+    "ws": "^8.23.0",
+    "zod": "^4.6.7"
+  }
+}

@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Verso</title>
+<link rel="icon" type="image/x-icon" href="/favicon.ico">
+<link rel="icon" type="image/png" sizes="32x32" href="/assets/favicon-32.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/iconify-icon@2/dist/iconify-icon.min.js"></script>
+<link rel="stylesheet" href="/css/projects.css">
+</head>
+<body>
+  <header class="top">
+    <div class="brand">
+      <img src="/assets/icon-192.png" alt="" width="26" height="26">
+      <span>Verso</span>
+    </div>
+    <div class="top-actions">
+      <button class="icon-btn" onclick="toggleTheme()" title="Toggle theme" aria-label="Toggle theme">
+        <iconify-icon id="theme-icon" icon="solar:sun-linear" width="18" height="18"></iconify-icon>
+      </button>
+      <button class="primary-btn" onclick="newProject()">
+        <iconify-icon icon="solar:add-circle-linear" width="16" height="16"></iconify-icon>
+        <span>New project</span>
+      </button>
+    </div>
+  </header>
+
+  <main>
+    <section class="intro">
+      <h1>Design with your agent</h1>
+      <p>Ask Claude Code, Codex or any MCP client to design screens. They appear here, live. Everything stays on this computer.</p>
+      <div class="connect">
+        <div class="connect-tabs" role="tablist">
+          <button class="connect-tab" data-client="claude" onclick="selectClient('claude')">Claude Code</button>
+          <button class="connect-tab" data-client="codex" onclick="selectClient('codex')">Codex</button>
+          <button class="connect-tab" data-client="json" onclick="selectClient('json')">Cursor &amp; others</button>
+          <button class="connect-tab" data-client="http" onclick="selectClient('http')">HTTP</button>
+        </div>
+        <div class="code">
+          <pre id="connect-code"></pre>
+          <button class="copy-btn" onclick="copyConnect(this)" title="Copy" aria-label="Copy">
+            <iconify-icon class="ic-copy" icon="solar:copy-linear" width="15" height="15"></iconify-icon>
+            <iconify-icon class="ic-done" icon="solar:check-read-linear" width="15" height="15"></iconify-icon>
+          </button>
+        </div>
+        <p id="connect-hint" class="hint"></p>
+      </div>
+    </section>
+
+    <section>
+      <div class="section-head">
+        <h2>Projects</h2>
+        <span id="data-dir" class="hint"></span>
+      </div>
+      <div id="projects" class="grid"></div>
+      <div id="empty" class="empty" style="display:none">
+        <iconify-icon icon="solar:smartphone-2-linear" width="28" height="28"></iconify-icon>
+        <p>No projects yet. Create one here, or ask your agent:</p>
+        <code>"Design a meditation app onboarding in Verso"</code>
+      </div>
+    </section>
+  </main>
+
+<script src="/js/projects.js"></script>
+</body>
+</html>

@@ -1,0 +1,671 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Verso — Preview</title>
+<link rel="icon" type="image/x-icon" href="/favicon.ico">
+<link rel="icon" type="image/png" sizes="32x32" href="/assets/favicon-32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="/assets/favicon-16.png">
+<link rel="apple-touch-icon" href="/assets/apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+:root {
+  --bg: #faf9f7;
+  --bg-warm: #f5f3f0;
+  --bg-card: #ffffff;
+  --border: rgba(0,0,0,0.06);
+  --border-card: rgba(0,0,0,0.08);
+  --text: #111111;
+  --text-dim: #6b7280;
+  --text-muted: #9ca3af;
+  --primary: #111111;
+  --primary-hover: #333333;
+}
+
+html, body {
+  height: 100%;
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Inter', -apple-system, system-ui, sans-serif;
+  font-size: 14px;
+  -webkit-font-smoothing: antialiased;
+}
+
+body {
+  opacity: 0;
+  animation: fadeIn 0.4s ease forwards;
+}
+@keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+
+/* ==================== HEADER ==================== */
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 32px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-card);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.logo {
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: -0.5px;
+  color: var(--text);
+  text-decoration: none;
+}
+
+.logo-dot {
+  color: var(--text-muted);
+}
+
+.header-center {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.project-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.published-date {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  border-radius: 8px;
+  border: 1px solid var(--border-card);
+  background: var(--primary);
+  color: #fff;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.btn:hover {
+  background: var(--primary-hover);
+}
+
+.btn svg {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+}
+
+/* ==================== CANVAS VIEWPORT ==================== */
+.canvas-viewport {
+  width: 100%;
+  height: calc(100vh - 53px);
+  overflow: hidden;
+  position: relative;
+  cursor: grab;
+}
+.canvas-viewport:active { cursor: grabbing; }
+
+.canvas-world {
+  position: absolute;
+  top: 0;
+  left: 0;
+  transform-origin: 0 0;
+  display: flex;
+  align-items: flex-start;
+  gap: 48px;
+  padding: 48px;
+  white-space: nowrap;
+}
+
+/* ==================== ZOOM TOOLBAR ==================== */
+.zoom-toolbar {
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  background: #1a1a1a;
+  border-radius: 10px;
+  padding: 4px;
+  z-index: 100;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.24), 0 2px 8px rgba(0,0,0,0.12);
+  user-select: none;
+}
+
+.zoom-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 36px;
+  height: 32px;
+  padding: 0 10px;
+  border: none;
+  background: transparent;
+  color: #e5e5e5;
+  font-family: 'Inter', -apple-system, system-ui, sans-serif;
+  font-size: 12px;
+  font-weight: 500;
+  border-radius: 7px;
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s;
+  white-space: nowrap;
+}
+
+.zoom-btn:hover { background: rgba(255,255,255,0.1); color: #fff; }
+.zoom-btn:active { background: rgba(255,255,255,0.15); }
+.zoom-btn.active { background: rgba(255,255,255,0.12); color: #fff; }
+
+.zoom-divider {
+  width: 1px;
+  height: 18px;
+  background: rgba(255,255,255,0.12);
+  margin: 0 2px;
+}
+
+.zoom-level {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 48px;
+  height: 32px;
+  padding: 0 6px;
+  color: #a0a0a0;
+  font-family: 'Inter', -apple-system, system-ui, sans-serif;
+  font-size: 12px;
+  font-weight: 500;
+  pointer-events: none;
+}
+
+/* ==================== PHONE FRAME ==================== */
+.screen-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 0;
+}
+
+.screen-name {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-dim);
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: center;
+}
+
+.phone-frame {
+  width: 393px;
+  height: 852px;
+  border-radius: 50px;
+  border: 6px solid #1a1a1a;
+  overflow: hidden;
+  position: relative;
+  background: #000;
+  box-shadow: 0 25px 60px rgba(0,0,0,0.12), 0 8px 20px rgba(0,0,0,0.08);
+  box-sizing: content-box;
+}
+
+.phone-frame iframe {
+  display: block;
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  border: none;
+  border-radius: 44px;
+  background: #fff;
+}
+
+.home-indicator {
+  position: absolute;
+  bottom: 8px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 134px;
+  height: 5px;
+  background: rgba(255,255,255,0.2);
+  border-radius: 100px;
+  z-index: 10;
+  pointer-events: none;
+}
+
+/* ==================== EMPTY STATE ==================== */
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: calc(100vh - 53px);
+  gap: 12px;
+  color: var(--text-muted);
+  text-align: center;
+  padding: 32px;
+}
+
+.empty-icon {
+  width: 64px;
+  height: 64px;
+  opacity: 0.3;
+  margin-bottom: 4px;
+}
+
+.empty-state h2 {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text-dim);
+}
+
+.empty-state p {
+  font-size: 14px;
+  color: var(--text-muted);
+  max-width: 360px;
+  line-height: 1.5;
+}
+
+/* ==================== LOADING ==================== */
+.loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: calc(100vh - 53px);
+  color: var(--text-muted);
+  font-size: 14px;
+  gap: 10px;
+}
+
+.spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid var(--border);
+  border-top-color: var(--text-dim);
+  border-radius: 50%;
+  animation: spin 0.6s linear infinite;
+}
+
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ==================== RESPONSIVE ==================== */
+@media (max-width: 520px) {
+  .header { padding: 12px 16px; }
+  .header-center { display: none; }
+  .zoom-toolbar { bottom: 16px; }
+}
+</style>
+</head>
+<body>
+
+<!-- ==================== HEADER ==================== -->
+<div class="header">
+  <div class="header-left">
+    <a class="logo" href="/">Verso<span class="logo-dot">.</span></a>
+  </div>
+  <div class="header-center" id="header-center" style="display:none;">
+    <div class="project-name" id="project-name"></div>
+    <div class="published-date" id="published-date"></div>
+  </div>
+  <div class="header-right">
+    <a class="btn" id="open-editor" href="/">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M5 12h14"/>
+        <path d="m12 5 7 7-7 7"/>
+      </svg>
+      Open in editor
+    </a>
+  </div>
+</div>
+
+<!-- ==================== CONTENT ==================== -->
+<div id="content">
+  <div class="loading"><div class="spinner"></div> Loading preview...</div>
+</div>
+
+<!-- ==================== ZOOM TOOLBAR ==================== -->
+<div class="zoom-toolbar" id="zoom-toolbar" style="display:none;">
+  <button class="zoom-btn" onclick="setZoom(0.5)" data-zoom="50">50</button>
+  <button class="zoom-btn" onclick="setZoom(0.75)" data-zoom="75">75</button>
+  <button class="zoom-btn" onclick="setZoom(1)" data-zoom="100">100</button>
+  <div class="zoom-divider"></div>
+  <button class="zoom-btn" onclick="zoomBy(-0.1)">−</button>
+  <div class="zoom-level" id="zoom-level">75%</div>
+  <button class="zoom-btn" onclick="zoomBy(0.1)">+</button>
+  <div class="zoom-divider"></div>
+  <button class="zoom-btn" onclick="zoomFit()">Fit</button>
+</div>
+
+<script>
+// ==================== HELPERS ====================
+function escapeHtml(str) {
+  const div = document.createElement('div');
+  div.textContent = str;
+  return div.innerHTML;
+}
+
+function timeAgo(dateStr) {
+  if (!dateStr) return '';
+  const d = new Date(dateStr);
+  if (isNaN(d)) return '';
+  const now = new Date();
+  const diffMs = now - d;
+  const diffMin = Math.floor(diffMs / 60000);
+  if (diffMin < 1) return 'Published just now';
+  if (diffMin < 60) return `Published ${diffMin}m ago`;
+  const diffHr = Math.floor(diffMin / 60);
+  if (diffHr < 24) return `Published ${diffHr}h ago`;
+  const diffDay = Math.floor(diffHr / 24);
+  if (diffDay < 30) return `Published ${diffDay}d ago`;
+  return 'Published ' + d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+}
+
+// ==================== RENDERER HTML ====================
+function buildRendererDoc(html) {
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"><\/script>
+<script src="https://code.iconify.design/iconify-icon/3.0.0/iconify-icon.min.js"><\/script>
+<style>
+html, body {
+  margin: 0; padding: 0; width: 100%; height: 100%;
+  overflow: hidden;
+  font-family: -apple-system, system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  background: #FFFFFF;
+  box-sizing: border-box;
+}
+#canvas {
+  width: 100%; height: 100%;
+  position: relative;
+  overflow-y: auto;
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+#canvas::-webkit-scrollbar { display: none; }
+</style>
+</head>
+<body>
+<div id="canvas">${html}</div>
+</body>
+</html>`;
+}
+
+// ==================== LOAD PREVIEW ====================
+async function loadPreview() {
+  const pathParts = window.location.pathname.split('/');
+  const projectId = pathParts[pathParts.length - 1];
+
+  if (!projectId || !/^[a-z0-9-]+$/.test(projectId)) {
+    showEmpty('Invalid preview link');
+    return;
+  }
+
+  try {
+    document.getElementById('open-editor').href = `/p/${projectId}`;
+    const res = await fetch(`/api/projects/${projectId}/preview`);
+
+    if (res.status === 404) {
+      showEmpty('Project not found.');
+      return;
+    }
+
+    if (!res.ok) {
+      showEmpty('Failed to load preview.');
+      return;
+    }
+
+    const data = await res.json();
+
+    // Update header
+    document.title = `${data.name} — Verso Preview`;
+    document.getElementById('project-name').textContent = data.name;
+    document.getElementById('published-date').textContent = timeAgo(data.publishedAt);
+    document.getElementById('header-center').style.display = '';
+
+    // Render screens
+    const screens = data.publishedScreens || [];
+    if (screens.length === 0) {
+      showEmpty('This project has no screens.');
+      return;
+    }
+
+    const container = document.getElementById('content');
+    container.innerHTML = '';
+
+    // Build viewport structure
+    const viewport = document.createElement('div');
+    viewport.className = 'canvas-viewport';
+    viewport.id = 'canvas-viewport';
+
+    const world = document.createElement('div');
+    world.className = 'canvas-world';
+    world.id = 'canvas-world';
+
+    screens.forEach((screen) => {
+      const item = document.createElement('div');
+      item.className = 'screen-item';
+
+      const label = document.createElement('div');
+      label.className = 'screen-name';
+      label.textContent = screen.name || 'Untitled';
+
+      const phone = document.createElement('div');
+      phone.className = 'phone-frame';
+
+      const iframe = document.createElement('iframe');
+      // Sandboxed published-content iframe. Critically NO `allow-same-origin`:
+      // forces an opaque origin so any AI-generated script can't reach the
+      // parent's localStorage / cookies (firebase auth token). Tailwind CDN
+      // and Iconify cross-origin scripts still work fine under allow-scripts.
+      iframe.sandbox = 'allow-scripts';
+      iframe.srcdoc = buildRendererDoc(screen.html || '');
+
+      const homeIndicator = document.createElement('div');
+      homeIndicator.className = 'home-indicator';
+
+      phone.appendChild(iframe);
+      phone.appendChild(homeIndicator);
+      item.appendChild(label);
+      item.appendChild(phone);
+      world.appendChild(item);
+    });
+
+    viewport.appendChild(world);
+    container.appendChild(viewport);
+
+    // Show toolbar and fit to view
+    document.getElementById('zoom-toolbar').style.display = '';
+    initCanvasControls();
+    // Small delay so layout settles before fitting
+    requestAnimationFrame(() => zoomFit());
+
+  } catch (e) {
+    console.error('Preview load error:', e);
+    showEmpty('Something went wrong loading the preview.');
+  }
+}
+
+function showEmpty(message) {
+  const container = document.getElementById('content');
+  container.innerHTML = `
+    <div class="empty-state">
+      <svg class="empty-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="5" y="2" width="14" height="20" rx="2" ry="2"/>
+        <line x1="12" y1="18" x2="12.01" y2="18"/>
+      </svg>
+      <h2>No preview available</h2>
+      <p>${escapeHtml(message)}</p>
+    </div>`;
+}
+
+// ==================== ZOOM / PAN ====================
+let currentZoom = 0.75;
+let panX = 0, panY = 0;
+let isPanning = false;
+let panStartX = 0, panStartY = 0;
+let panStartPanX = 0, panStartPanY = 0;
+
+function applyTransform() {
+  const world = document.getElementById('canvas-world');
+  if (!world) return;
+  world.style.transform = `translate(${panX}px, ${panY}px) scale(${currentZoom})`;
+
+  // Update zoom level display
+  const label = document.getElementById('zoom-level');
+  if (label) label.textContent = Math.round(currentZoom * 100) + '%';
+
+  // Update active preset buttons
+  document.querySelectorAll('.zoom-btn[data-zoom]').forEach(btn => {
+    const preset = parseInt(btn.dataset.zoom);
+    btn.classList.toggle('active', Math.round(currentZoom * 100) === preset);
+  });
+}
+
+function setZoom(z, centerX, centerY) {
+  const viewport = document.getElementById('canvas-viewport');
+  if (!viewport) return;
+  const newZoom = Math.max(0.1, Math.min(3, z));
+
+  // Zoom toward center of viewport (or specified point)
+  if (centerX === undefined) {
+    centerX = viewport.clientWidth / 2;
+    centerY = viewport.clientHeight / 2;
+  }
+
+  const ratio = newZoom / currentZoom;
+  panX = centerX - ratio * (centerX - panX);
+  panY = centerY - ratio * (centerY - panY);
+  currentZoom = newZoom;
+  applyTransform();
+}
+
+function zoomBy(delta) {
+  setZoom(currentZoom + delta);
+}
+
+function zoomFit() {
+  const viewport = document.getElementById('canvas-viewport');
+  const world = document.getElementById('canvas-world');
+  if (!viewport || !world) return;
+
+  // Measure world content at scale=1
+  const prevTransform = world.style.transform;
+  world.style.transform = 'scale(1)';
+  const contentW = world.scrollWidth;
+  const contentH = world.scrollHeight;
+  world.style.transform = prevTransform;
+
+  const vw = viewport.clientWidth;
+  const vh = viewport.clientHeight;
+  const padding = 64;
+
+  const scaleX = (vw - padding) / contentW;
+  const scaleY = (vh - padding) / contentH;
+  currentZoom = Math.max(0.1, Math.min(1, Math.min(scaleX, scaleY)));
+
+  // Center content
+  panX = (vw - contentW * currentZoom) / 2;
+  panY = (vh - contentH * currentZoom) / 2;
+  applyTransform();
+}
+
+function initCanvasControls() {
+  const viewport = document.getElementById('canvas-viewport');
+  if (!viewport) return;
+
+  // Mouse pan
+  viewport.addEventListener('pointerdown', (e) => {
+    // Don't pan if clicking inside an iframe
+    if (e.target.tagName === 'IFRAME') return;
+    isPanning = true;
+    panStartX = e.clientX;
+    panStartY = e.clientY;
+    panStartPanX = panX;
+    panStartPanY = panY;
+    viewport.setPointerCapture(e.pointerId);
+  });
+
+  viewport.addEventListener('pointermove', (e) => {
+    if (!isPanning) return;
+    panX = panStartPanX + (e.clientX - panStartX);
+    panY = panStartPanY + (e.clientY - panStartY);
+    applyTransform();
+  });
+
+  viewport.addEventListener('pointerup', () => { isPanning = false; });
+  viewport.addEventListener('pointercancel', () => { isPanning = false; });
+
+  // Wheel zoom (pinch on trackpad)
+  viewport.addEventListener('wheel', (e) => {
+    e.preventDefault();
+    if (e.ctrlKey || e.metaKey) {
+      // Pinch zoom — use deltaY as zoom factor
+      const rect = viewport.getBoundingClientRect();
+      const cx = e.clientX - rect.left;
+      const cy = e.clientY - rect.top;
+      const factor = 1 - e.deltaY * 0.005;
+      setZoom(currentZoom * factor, cx, cy);
+    } else {
+      // Regular scroll → pan
+      panX -= e.deltaX;
+      panY -= e.deltaY;
+      applyTransform();
+    }
+  }, { passive: false });
+
+  // Keyboard shortcuts
+  document.addEventListener('keydown', (e) => {
+    if (e.key === '0' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); zoomFit(); }
+    if (e.key === '1' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); setZoom(1); }
+    if (e.key === '=' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); zoomBy(0.1); }
+    if (e.key === '-' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); zoomBy(-0.1); }
+  });
+}
+
+// ==================== INIT ====================
+loadPreview();
+</script>
+</body>
+</html>
